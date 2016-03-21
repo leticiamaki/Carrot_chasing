@@ -1,0 +1,59 @@
+void Callback(const nav_msgs::OdometryConstPtr &msg){  // tipo de mensagem que a callback recebe
+    //declaração de variáveis
+    double yaw, d, teta, xf = 4, yf = 1.5, deltaTeta, k = 1, r = 0.1, v, w, x, y; 
+    
+    geometry_msgs::Quaternion qt;
+    geometry_msgs::Point position;
+    
+    geometry_msgs::Twist twist_msg; 
+    
+    //Equações
+    qt = msg->pose.pose.orientation;  // pegando posição
+    yaw = tf::getYaw(qt);             //só quero o yaw
+    ROS_INFO("VALUE YAW: %f", yaw);   // imprimindo yaw 
+    
+    position= msg->pose.pose.position;  //pegando posição x e y
+    
+    d = sqrt(pow(xf - position.x, 2) + pow(yf - position.y, 2));
+    teta = atan2(yf - position.y, xf - position.x);
+    deltaTeta = teta - yaw;
+    ROS_INFO("DELTA TETA: %F", deltaTeta);
+    
+    if (d > 0.2){     // ainda não chegou
+        if(deltaTeta < -0.055 || deltaTeta > 0.055){    // o valor do w é proporcional ao deltaTeta
+            v = 0;   
+            w = 0.8 * deltaTeta;                        //alinhando o carro com o angulo
+        }
+        else{
+            v = 1;                                     // já alinhado, avance 
+            w = 0;
+        }
+    }
+    else{                                              // encontrou a posição de chegada
+        v = 0;
+        w = 0;
+    } 
+    
+    //w = k * deltaTeta;
+    //  v = w * r;
+    
+    twist_msg.linear.x = v;
+    twist_msg.angular.z = w; 
+    pub.publish(twist_msg);        
+}
+
+int main(int argc, char **argv){
+    
+    ros::init(argc, argv, "quart2yaw");  //node name
+    
+    ros::NodeHandle node;
+    
+    ros::Subscriber sub = node.subscribe("/vrep/vehicle/odometry", 1, Callback);
+    
+    pub = node.advertise<geometry_msgs::Twist>("go_to_point",1);
+    
+    ros::spin();
+    
+    return 0;
+}
+
